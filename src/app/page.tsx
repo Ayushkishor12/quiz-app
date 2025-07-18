@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Trophy, Play, BarChart3, Settings } from "lucide-react"
 import QuizGame from "@/components/quiz-game"
 import Leaderboard from "@/components/leaderboard"

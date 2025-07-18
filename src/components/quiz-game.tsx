@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Clock, CheckCircle, XCircle, Home } from "lucide-react"
-// ⬇️ Replace static data with dynamic fetch
 import { fetchQuizQuestions } from "@/lib/quiz-data"
 import { saveScore } from "@/lib/leaderboard"
 
@@ -34,7 +33,6 @@ export default function QuizGame({ category, difficulty, onComplete, soundEnable
   const [startTime, setStartTime] = useState(Date.now())
   const [playerName, setPlayerName] = useState("")
 
-  // ⬇️ Fetch Gemini-generated questions
   useEffect(() => {
     async function loadQuestions() {
       const fetched = await fetchQuizQuestions(category, difficulty)
@@ -45,20 +43,15 @@ export default function QuizGame({ category, difficulty, onComplete, soundEnable
     loadQuestions()
   }, [category, difficulty])
 
-  useEffect(() => {
-    if (gameState === "playing" && timeLeft > 0) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000)
-      return () => clearTimeout(timer)
-    } else if (timeLeft === 0 && gameState === "playing") {
-      handleAnswer(-1)
-    }
-  }, [timeLeft, gameState])
-
   const playSound = useCallback(
     (type: "correct" | "incorrect" | "complete") => {
       if (!soundEnabled) return
       try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+        const AudioContextClass =
+          window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        if (!AudioContextClass) return
+
+        const audioContext = new AudioContextClass()
         const oscillator = audioContext.createOscillator()
         const gainNode = audioContext.createGain()
         oscillator.connect(gainNode)
@@ -88,35 +81,47 @@ export default function QuizGame({ category, difficulty, onComplete, soundEnable
     [soundEnabled]
   )
 
-  const handleAnswer = (answerIndex: number) => {
-    if (gameState !== "playing") return
+  const handleAnswer = useCallback(
+    (answerIndex: number) => {
+      if (gameState !== "playing") return
 
-    setSelectedAnswer(answerIndex)
-    setGameState("answered")
+      setSelectedAnswer(answerIndex)
+      setGameState("answered")
 
-    const isCorrect = answerIndex === questions[currentQuestionIndex].correct
-    if (isCorrect) {
-      const timeBonus = Math.floor(timeLeft / 3)
-      const difficultyMultiplier = difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3
-      setScore(score + (10 + timeBonus) * difficultyMultiplier)
-      playSound("correct")
-    } else {
-      playSound("incorrect")
-    }
-
-    setTimeout(() => {
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1)
-        setSelectedAnswer(null)
-        setTimeLeft(30)
-        setGameState("playing")
+      const isCorrect = answerIndex === questions[currentQuestionIndex].correct
+      if (isCorrect) {
+        const timeBonus = Math.floor(timeLeft / 3)
+        const difficultyMultiplier = difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3
+        setScore((prev) => prev + (10 + timeBonus) * difficultyMultiplier)
+        playSound("correct")
       } else {
-        setTotalTime(Date.now() - startTime)
-        setGameState("finished")
-        playSound("complete")
+        playSound("incorrect")
       }
-    }, 1500)
-  }
+
+      setTimeout(() => {
+        if (currentQuestionIndex < questions.length - 1) {
+          setCurrentQuestionIndex((prev) => prev + 1)
+          setSelectedAnswer(null)
+          setTimeLeft(30)
+          setGameState("playing")
+        } else {
+          setTotalTime(Date.now() - startTime)
+          setGameState("finished")
+          playSound("complete")
+        }
+      }, 1500)
+    },
+    [gameState, questions, currentQuestionIndex, timeLeft, difficulty, playSound, startTime]
+  )
+
+  useEffect(() => {
+    if (gameState === "playing" && timeLeft > 0) {
+      const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000)
+      return () => clearTimeout(timer)
+    } else if (timeLeft === 0 && gameState === "playing") {
+      handleAnswer(-1)
+    }
+  }, [timeLeft, gameState, handleAnswer])
 
   const handleSaveScore = () => {
     if (playerName.trim()) {
@@ -134,19 +139,7 @@ export default function QuizGame({ category, difficulty, onComplete, soundEnable
 
   if (questions.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950 dark:to-blue-950 flex items-center justify-center">
-        <Card className="w-96">
-          <CardContent className="p-8 text-center">
-            <p>Loading questions...</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (questions.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950 dark:to-blue-950 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950 dark:to-blue-950">
         <Card className="w-96">
           <CardContent className="p-8 text-center">
             <p>Loading questions...</p>
